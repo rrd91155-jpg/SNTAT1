@@ -1,0 +1,54 @@
+
+name: Build SNTAT APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract Android Project
+        run: |
+          mkdir source
+          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found"
+            exit 1
+          fi
+          unzip -o "$ZIP_FILE" -d source
+          GRADLE_FILE=$(find source -name settings.gradle.kts -o -name settings.gradle | head -n 1)
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "Gradle project not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$GRADLE_FILE")" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SNTAT-APK
+          path: source/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
